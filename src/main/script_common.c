@@ -71,7 +71,7 @@ void MAIN_func_800FADE0(void);
 void MAIN_func_800FD534(ItemMenuBox *box, int32_t style);
 int32_t MAIN_func_800FD61C(ItemMenuBox *box, RECT *origin, int32_t uiBoxId);
 void MAIN_func_801000E4(void);
-int32_t MAIN_func_800FA834(void);
+int32_t shopFillBuyItemList(void);
 int32_t MAIN_func_800FAA68(void);
 int32_t MAIN_func_800FAFB0(void);
 void MAIN_func_800FB070(void);
@@ -328,10 +328,71 @@ static void *script_common_functions[] = {
 	MAIN_func_800FADE0,
 	MAIN_func_800FAB30,
 	MAIN_func_800FAA68,
-	MAIN_func_800FA834,
+	shopFillBuyItemList,
 };
 
-INCLUDE_ASM("asm/main/nonmatchings/script_common", MAIN_func_800FA834);
+int32_t shopFillBuyItemList() {
+  uint8_t itemId;
+  uint8_t slotId;
+  int32_t hasSpace;
+  uint8_t *itemList;
+  uint32_t inventorySize;
+  int32_t canBuyAnything;
+
+  inventorySize = INVENTORY.size;
+  itemList = MAIN_D_80134F68->buf;
+  canBuyAnything = 0;
+  hasSpace = 0;
+  MAIN_D_80134F68->itemCount = 0;
+
+  for (slotId = 0; slotId < inventorySize; slotId++) {
+    if (INVENTORY.types.array[slotId] == 0xFF) {
+      hasSpace = 1;
+      break;
+    }
+  }
+
+  for (itemId = 0; itemId < 128; itemId++) {
+
+    if (!isTriggerSet(0x180 + itemId))
+      continue;
+
+    MAIN_D_80134F68->itemCount++;
+    *itemList++ = itemId;
+
+    if (ITEM_PARA[itemId].value > MONEY) {
+      *itemList++ = 0;
+      continue;
+    }
+
+    if (hasSpace) {
+      for (slotId = 0; slotId < inventorySize; slotId++) {
+        if (INVENTORY.types.array[slotId] == itemId &&
+            INVENTORY.amounts.array[slotId] == 99) {
+          *itemList++ = 0;
+          goto end;
+        }
+      }
+      *itemList++ = 1;
+      canBuyAnything = 1;
+    } else {
+      for (slotId = 0; slotId < inventorySize; slotId++) {
+        if (INVENTORY.types.array[slotId] == itemId &&
+            INVENTORY.amounts.array[slotId] != 99) {
+          *itemList++ = 1;
+          canBuyAnything = 1;
+          goto end;
+        }
+      }
+      *itemList++ = 0;
+    }
+
+  end:
+    continue;
+  }
+
+  return canBuyAnything;
+}
 
 int32_t MAIN_func_800FAA68(void)
 {
@@ -1066,7 +1127,7 @@ void MAIN_func_800FC508(void)
 	case 4:
 		setInputRepeatMask(0x5000);
 		MAIN_D_80135011 = 0;
-		MAIN_func_800FA834();
+		shopFillBuyItemList();
 		MAIN_func_800FCA3C();
 		showShopkeeperTextbox(8, npcId, 0);
 		SELECTION_MENU_STATE = 1;
